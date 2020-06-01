@@ -1,7 +1,7 @@
 part of logger_flutter;
 
 ListQueue<OutputEvent> _outputEventBuffer = ListQueue();
-int _bufferSize = 20;
+int _bufferSize = 50;
 bool _initialized = false;
 
 class LogConsole extends StatefulWidget {
@@ -16,16 +16,34 @@ class LogConsole extends StatefulWidget {
 
     _bufferSize = bufferSize;
     _initialized = true;
-    Logger.addOutputListener((e) {
-      if (_outputEventBuffer.length == bufferSize) {
-        _outputEventBuffer.removeFirst();
-      }
-      _outputEventBuffer.add(e);
-    });
+  }
+
+  static LogConsoleOutput _logOutput;
+
+  static LogConsoleOutput getOutPut() {
+    if (_logOutput == null) _logOutput = LogConsoleOutput();
+    return _logOutput;
   }
 
   @override
   _LogConsoleState createState() => _LogConsoleState();
+}
+
+typedef LogConsoleOutputCallback = Function(OutputEvent event);
+
+class LogConsoleOutput extends LogOutput {
+  List<LogConsoleOutputCallback> listeners = [];
+
+  LogConsoleOutput();
+
+  @override
+  void output(OutputEvent event) {
+    if (_outputEventBuffer.length == _bufferSize) {
+      _outputEventBuffer.removeFirst();
+    }
+    _outputEventBuffer.add(event);
+    listeners.forEach((element) => element(event));
+  }
 }
 
 class RenderedEvent {
@@ -38,8 +56,7 @@ class RenderedEvent {
 }
 
 class _LogConsoleState extends State<LogConsole> {
-  OutputCallback _callback;
-
+  LogConsoleOutputCallback _callback;
   ListQueue<RenderedEvent> _renderedBuffer = ListQueue();
   List<RenderedEvent> _filteredBuffer = [];
 
@@ -66,12 +83,11 @@ class _LogConsoleState extends State<LogConsole> {
       _refreshFilter();
     };
 
-    Logger.addOutputListener(_callback);
+    LogConsole.getOutPut().listeners.add(_callback);
 
     _scrollController.addListener(() {
       if (!_scrollListenerEnabled) return;
-      var scrolledToBottom = _scrollController.offset >=
-          _scrollController.position.maxScrollExtent;
+      var scrolledToBottom = _scrollController.offset >= _scrollController.position.maxScrollExtent;
       setState(() {
         _followBottom = scrolledToBottom;
       });
@@ -310,7 +326,7 @@ class _LogConsoleState extends State<LogConsole> {
 
   @override
   void dispose() {
-    Logger.removeOutputListener(_callback);
+    LogConsole.getOutPut().listeners.remove(_callback);
     super.dispose();
   }
 }
